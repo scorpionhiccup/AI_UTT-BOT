@@ -1,6 +1,11 @@
 import sys
 import random
 import signal
+<<<<<<< HEAD
+=======
+from action import Action
+EMPTY = '-'
+>>>>>>> 8ba3e4df2c18f9e4d8dcd845032234156ff3b8b5
 
 #Timer handler, helper function
 
@@ -11,6 +16,239 @@ def handler(signum, frame):
     #print 'Signal handler called with signal', signum
     raise TimedOutExc()
 
+<<<<<<< HEAD
+=======
+class UTTTBoard:
+    def __init__(self, boards=list()):
+        self._boards = boards
+        i = len(boards)
+        while i < 9:
+            self._boards.append(MiniBoard())
+            i += 1
+        self._winner = None
+        self._available_boards = [i for i in xrange(9) if
+                                  self._boards[i].is_board_full() == False]
+
+    def do_move(self, player, miniB_index, inner_index):
+        assert (miniB_index in self._available_boards)
+        self.get_miniBoard(miniB_index).do_move(player, inner_index)
+        self._assess_board()
+        if self.get_miniBoard(miniB_index).is_board_full():
+            self._available_boards.remove(miniB_index)
+
+    def _assess_board(self):
+        if self._winner is not None:
+            return
+        get_func = lambda obj, index: (self._boards[index].get_winner() or EMPTY)
+        self._winner = assess_board(self._boards, get_func)
+
+
+    def has_winner(self):
+        return (self._winner is not None)
+
+    def get_winner(self):
+        return self._winner
+
+    def is_board_full(self):
+        return len(self._available_boards) == 0
+
+    def get_miniBoard(self, index):
+        assert (0 <= index < 9)
+        return self._boards[index]
+
+    def get_single_cell(self, miniBoard_pos, inner_pos):
+        return self.get_miniBoard(miniBoard_pos).get(inner_pos)
+
+    def deep_copy(self):
+        dup_boards = [miniB.deep_copy() for miniB in self._boards]
+        dup = UTTTBoard(dup_boards)
+        dup._winner = self._winner
+        return dup
+
+    def convert_t2D(self):
+        full_board = []
+        for miniB_row in xrange(3):
+            for inner_row in xrange(3):
+                row = []
+                for col in xrange(3):
+                    mini = (self._boards)[miniB_row * 3 + col]
+                    middle = str(mini.get_winner()) if inner_row == 1 else SPACE
+                    row.extend(mini.get_board()[
+                               inner_row * 3: inner_row * 3 + 3] if not mini.has_winner() else [
+                        SPACE, middle, SPACE])
+                full_board.append(row)
+        return full_board
+
+    def convert_tMiniB(self):
+        return MiniBoard([(innerB.get_winner() or EMPTY) for innerB in self._boards])
+
+    def __str__(self):
+        return '\n'.join([str(miniB) for miniB in self._boards])
+
+    def __hash__(self):
+        return hash(str(self))
+
+    def __eq__(self, other):
+        return str(self) == str(other)
+
+
+class State:
+    def __init__(self, uttt=None, player=Player(), mini_board=None):
+        self._uttt = UTTTBoard() if uttt is None else uttt.deep_copy()
+        self.player_turn = player  # default to x's turn
+        self.mini_board = mini_board
+        self._last_move = None
+
+    def get_legal_actions(self):
+        acts = []
+        miniBs = [self.mini_board] if self.mini_board is not None else range(9)
+        #debug('available miniBs: %s' % miniBs)
+        for board_index in miniBs:
+            legal_cells = self._uttt.get_miniBoard(board_index).get_legal_cells()
+            for cell in legal_cells:
+                acts.append(Action(board_index, cell))
+        return acts
+
+    def generate_successor(self, act):
+        new_state = State(self._uttt, self.player_turn.opponent(), act.inner_index)
+        new_state._uttt.do_move(self.player_turn, act.miniB_index, act.inner_index)
+        new_state._last_move = act
+        if new_state._uttt.get_miniBoard(act.inner_index).is_board_full():
+            new_state.mini_board = None
+        return new_state
+
+    def is_terminal(self):
+        return self._uttt.has_winner() or self._uttt.is_board_full()
+
+    def get_last_move(self):
+        return self._last_move
+
+    def get_board(self):
+        return self._uttt
+
+    def get_player(self):
+        return self.player_turn
+
+    '''def draw(self):
+        if Game.ENABLE_GRAPHICS:
+            print 'Player %s turn: (board state befor the move)' % self.player_turn
+            draw_board(self._uttt, self.mini_board)
+    '''
+
+    def deep_copy(self):
+        new_state = State(self._uttt, self.player_turn, self.mini_board)
+        new_state._last_move = self._last_move
+        return new_state
+
+    def __str__(self):
+        return str(self._uttt) + str(self.player_turn)
+
+    def __hash__(self):
+        return hash(str(self))
+
+    def __eq__(self, other):
+        return str(self) == str(other)
+
+
+class WinningPossibilitiesHeu(Heuristic):
+    #parameters for that heuristics
+    APPROXIMATE_WIN_SCORE = 7
+    BIG_BOARD_WEIGHT = 23
+    WIN_SCORE = 10**6
+    POSSIBLE_WIN_SEQUENCES = [(0,1,2), (3,4,5), (6,7,8), (0,3,6), (1,4,7), (2,5,8), (0,4,8), (2,4,6)]
+
+    def get_evaluate_function(player_obj):
+        return lambda some_state: WinningPossibilitiesHeu.__eval_state(some_state, player_obj)
+
+    def __eval_state(state, player):
+        uttt_board = state.get_board()
+        if uttt_board.has_winner():
+            winner = uttt_board.get_winner()
+            free_cells = 0
+            for i in xrange(9):
+                miniB = uttt_board.get_miniBoard(i)
+                free_cells += len(miniB.get_legal_cells())
+            return WinningPossibilitiesHeu.WIN_SCORE + free_cells if winner == str(player) else -WinningPossibilitiesHeu.WIN_SCORE - free_cells
+        if uttt_board.is_board_full():
+            return 0
+        board_as_mini = uttt_board.convert_tMiniB()
+        ret = WinningPossibilitiesHeu.__assess_miniB(board_as_mini, player) * WinningPossibilitiesHeu.BIG_BOARD_WEIGHT
+        for i in xrange(9):
+            miniB = uttt_board.get_miniBoard(i)
+            if not miniB.is_board_full():
+                ret += WinningPossibilitiesHeu.__assess_miniB(miniB, player)
+        return ret
+
+    def __assess_miniB(miniB, player):
+        if miniB.is_board_full():
+            return 0
+        player_counter = 0
+        opponent_counter = 0
+        player_str = str(player)
+        opponent_str = str(player.opponent())
+        miniB_as_list = miniB.get_board()
+        for seq in WinningPossibilitiesHeu.POSSIBLE_WIN_SEQUENCES:
+            filtered_seq = [miniB_as_list[index] for index in seq if miniB_as_list[index] != EMPTY]
+            if player_str in filtered_seq:
+                if opponent_str in filtered_seq:
+                    continue
+                if len(filtered_seq) > 1:
+                    player_counter += WinningPossibilitiesHeu.APPROXIMATE_WIN_SCORE
+                player_counter += 1
+            elif opponent_str in filtered_seq:
+                if len(filtered_seq) > 1:
+                    opponent_counter += WinningPossibilitiesHeu.APPROXIMATE_WIN_SCORE
+                opponent_counter += 1
+        return player_counter - opponent_counter
+
+
+class AlphaBetha:
+    # The searching depth of the alpha-beta. Note that the depth decrease only on opponents turns
+    # therefor the actual depth in the game tree is TWICE the value of ALPHA_BETA_DEPTH.
+    ALPHA_BETA_DEPTH = 2
+
+    def __runAB(eval_func, state):
+        acts_res = []
+        for act in state.get_legal_actions():
+            successor_state = state.generate_successor(act)
+            acts_res.append((act, AlphaBetha.__min_val_ab(eval_func, successor_state, AlphaBetha.ALPHA_BETA_DEPTH)))
+        _, best_val = max(acts_res, key=lambda x: x[1])
+        return random.choice([best_action for best_action, val in acts_res if val == best_val])
+    
+    def __min_val_ab(eval_func, state, depth, alpha=-sys.maxint, beta=sys.maxint):
+        if AlphaBetha.__terminal_test(state, depth):
+            return eval_func(state)
+        val = sys.maxint
+        for act in state.get_legal_actions():
+            successor_state = state.generate_successor(act)
+            val = min(val, AlphaBetha.__max_val_ab(eval_func, successor_state, depth - 1, alpha, beta))
+            if val <= alpha:
+                return val
+            beta = min(beta, val)
+        return val
+    
+    def __max_val_ab(eval_func, state, depth, alpha=-sys.maxint, beta=sys.maxint):
+        if AlphaBetha.__terminal_test(state, depth):
+            return eval_func(state)
+        val = -sys.maxint
+        for act in state.get_legal_actions():
+            successor_state = state.generate_successor(act)
+            val = max(val, AlphaBetha.__min_val_ab(eval_func, successor_state, depth, alpha, beta))
+            if val >= beta:
+                return val
+            alpha = max(alpha, val)
+        return val
+    
+    def __terminal_test(state, depth):
+        return state.is_terminal() or (depth == 0)
+
+    def __init__(self, heuristic, player_obj):
+        self._eval_func = heuristic.get_evaluate_function(player_obj)
+
+    def choose_act(self, state):
+        return AlphaBetha.__runAB(self._eval_func, state)
+
+>>>>>>> 8ba3e4df2c18f9e4d8dcd845032234156ff3b8b5
 
 class Manual_player:
 	def __init__(self):
