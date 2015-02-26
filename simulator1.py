@@ -25,18 +25,82 @@ class Manual_player:
 class Player1:
 	
 	def __init__(self):
-		POSSIBLE_WIN_SEQUENCES = [(0,1,2), (3,4,5), (6,7,8), (0,3,6), (1,4,7), (2,5,8), (0,4,8), (2,4,6)]
-		WIN_SCORE = 10**6
-		APPROXIMATE_WIN_SCORE = 7
-		BIG_BOARD_WEIGHT = 23
+		self.POSSIBLE_WIN_SEQUENCES = [(0,1,2), (3,4,5), (6,7,8), (0,3,6), (1,4,7), (2,5,8), (0,4,8), (2,4,6)]
+		self.WIN_SCORE = 10**6
+		self.APPROXIMATE_WIN_SCORE = 7
+		self.BIG_BOARD_WEIGHT = 23
 		pass
 
-	def access_block(block_stat, ):
+	def assess_block(self, block, flag):
+		count = 0
+		count2 = 0
+		opponent_flag = 'x' if flag == 'o' else 'o'
+		for seq in self.POSSIBLE_WIN_SEQUENCES:
+			temp_seq = [block[index] for index in seq if block[index] != '-']
+			if flag in temp_seq:
+				if opponent_flag in temp_seq:
+					continue
+				if len(temp_seq) > 1:
+					count += self.APPROXIMATE_WIN_SCORE
+				count += 1
+			elif opponent_flag in temp_seq:
+				if len(temp_seq) > 1:
+					count2 += self.APPROXIMATE_WIN_SCORE
+				count2 += 1
+		return count - count2
 
-	def Winning_Heurisitic(temp_board, block_stat, blocks_allowed, old_move, flag):
-		if terminal_state_reached(temp_board, block_stat) == True:
-			return len(blocks_allowed) + self.WIN_SCORE if flag == 1 else -self.WIN_SCORE - len(blocks_allowed)
-		access_block(block_stat, )
+	def Winning_Heurisitic(self, temp_board, block_stat, blocks_allowed, old_move, flag):
+		
+		gamestate, msg = terminal_state_reached(temp_board, block_stat)
+		if gamestate == True:
+			if msg != 'D':
+				return len(blocks_allowed) + self.WIN_SCORE if flag == 1 else -self.WIN_SCORE - len(blocks_allowed)
+			else:
+				return 0
+		
+		start_row = 0
+		start_col = 0
+		flag = 'x' if flag == 0 else 'o'
+		ret = self.assess_block(block_stat, flag)
+		
+		for i in xrange(9):
+			if block_stat[i] == '-':
+				temp_block = []
+				for row in temp_board[start_col][start_col+3]:
+					for j in range(start_row, start_row + 3):
+						temp_block.append(row[j])
+				temp_block = [row[j] for row in temp_board[start_col][start_col+3] for j in range(start_row, start_row + 3)]
+				ret += self.assess_block(temp_block, flag)
+			elif flag == block_stat[i]:
+				if flag == 'x':
+					ret += self.APPROXIMATE_WIN_SCORE
+				else:
+					ret -= self.APPROXIMATE_WIN_SCORE
+			else:
+				if flag == 'x':
+					ret -= self.APPROXIMATE_WIN_SCORE
+				else:
+					ret += self.APPROXIMATE_WIN_SCORE	
+			
+			start_col = (start_col + 3) % 9
+			if start_col == 0:
+				start_row += 3
+
+		return ret
+
+		'''if 0 in blocks_allowed and 1 in blocks_allowed and 3 in blocks_allowed:
+			temp_block = [temp_board[0:2] for row in temp_board[0:2]]
+			ret = assess_block(temp_block, flag)
+			
+			temp_block = [temp_board[3:5] for row in temp_board[0:2]]
+			ret += assess_block(temp_block, flag)
+			
+			temp_block = [temp_board[0:2] for row in temp_board[3:5]]
+			ret += assess_block(temp_block, flag)
+		elif 1 in blocks_allowed and 2 in blocks_allowed and 5 in blocks_allowed:
+
+		block_no = (old_move[0]/3)*3 + old_move[1]/3
+		'''
 
 
 	def alpha_beta_pruning(self, temp_board, board_stat, old_move, alpha, beta, flag, depth):
@@ -59,7 +123,7 @@ class Player1:
 				blocks_allowed  = [3,6,7]
 			elif old_move[0] in [2,5,8] and old_move[1] in [2,5,8]:
 				### bottom right 3 blocks are allowed
-				blocks_allowed = [5,7,8]
+				blocks_allowed = [5, 7, 8]
 			else:
 				print "SOMETHING REALLY WEIRD HAPPENED!"
 				sys.exit(1)
@@ -87,17 +151,29 @@ class Player1:
                     if board_stat[i] != '-':
                         blocks_allowed.remove(i)
 
+		cells = get_empty_out_of(temp_board, blocks_allowed, board_stat)
 		
 		if(depth > 4):
 			'''
 				Heuristic
 			'''
-			#print temp_board
-			'''val = assess_board(temp_board, board_stat, old_move, flag)'''
-			Winning_Heurisitic(temp_board, block_stat, blocks_allowed, old_move, flag)
-			return [old_move[0], old_move[1], 0]
-		
-		cells = get_empty_out_of(temp_board, blocks_allowed, board_stat)
+			util = sys.maxint if flag else -sys.maxint - 1
+			best_move = old_move
+			for i in cells:
+				a, b  = i
+				temp_board[a][b] = 'o' if flag else 'x'
+				temp = self.Winning_Heurisitic(temp_board, board_stat, blocks_allowed, (a, b), flag)
+				if flag:
+					if temp < util:
+						best_move = (a, b)
+						util = temp
+				else:
+					if temp > util:
+						best_move = (a, b)
+						util = temp	
+
+			return [best_move[0], best_move[1], util]
+			
 		
 		if depth%2 == 0:
 			'''Max Node'''
