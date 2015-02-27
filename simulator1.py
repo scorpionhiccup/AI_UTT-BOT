@@ -35,19 +35,34 @@ class Player1:
 		count = 0
 		count2 = 0
 		opponent_flag = 'x' if flag == 'o' else 'o'
-		for seq in self.POSSIBLE_WIN_SEQUENCES:
-			temp_seq = [block[index] for index in seq if block[index] != '-']
-			if flag in temp_seq:
-				if opponent_flag in temp_seq:
-					continue
-				if len(temp_seq) > 1:
-					count += self.APPROXIMATE_WIN_SCORE
-				count += 1
-			elif opponent_flag in temp_seq:
-				if len(temp_seq) > 1:
-					count2 += self.APPROXIMATE_WIN_SCORE
-				count2 += 1
-		return count - count2
+		if len(block) == 9:
+			for seq in self.POSSIBLE_WIN_SEQUENCES:
+				temp_seq = [block[index] for index in seq if block[index] != '-']
+				if flag in temp_seq:
+					if opponent_flag in temp_seq:
+						continue
+					if len(temp_seq) > 1:
+						count += self.APPROXIMATE_WIN_SCORE
+					count += 1
+				elif opponent_flag in temp_seq:
+					if len(temp_seq) > 1:
+						count2 += self.APPROXIMATE_WIN_SCORE
+					count2 += 1
+			return count - count2
+		else:
+			for seq in self.POSSIBLE_WIN_SEQUENCES:
+				temp_seq = [block[index/3][index%3] for index in seq if block[index/3][index%3] != '-']
+				if flag in temp_seq:
+					if opponent_flag in temp_seq:
+						continue
+					if len(temp_seq) > 1:
+						count += self.APPROXIMATE_WIN_SCORE
+					count += 1
+				elif opponent_flag in temp_seq:
+					if len(temp_seq) > 1:
+						count2 += self.APPROXIMATE_WIN_SCORE
+					count2 += 1
+			return count - count2	
 
 	def Winning_Heurisitic(self, temp_board, block_stat, blocks_allowed, old_move, flag):
 		
@@ -65,11 +80,7 @@ class Player1:
 		
 		for i in xrange(9):
 			if block_stat[i] == '-':
-				temp_block = []
-				for row in temp_board[start_col][start_col+3]:
-					for j in range(start_row, start_row + 3):
-						temp_block.append(row[j])
-				temp_block = [row[j] for row in temp_board[start_col][start_col+3] for j in range(start_row, start_row + 3)]
+				temp_block = [ row[start_row:start_row + 3] for row in temp_board[start_col:start_col+3] ]
 				ret += self.assess_block(temp_block, flag)
 			elif flag == block_stat[i]:
 				if flag == 'x':
@@ -153,7 +164,7 @@ class Player1:
 
 		cells = get_empty_out_of(temp_board, blocks_allowed, board_stat)
 		
-		if(depth > 4):
+		if(depth > 3):
 			'''
 				Heuristic
 			'''
@@ -171,7 +182,7 @@ class Player1:
 					if temp > util:
 						best_move = (a, b)
 						util = temp	
-
+				temp_board[a][b] = '-'
 			return [best_move[0], best_move[1], util]
 			
 		
