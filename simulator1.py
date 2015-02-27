@@ -25,73 +25,68 @@ class Manual_player:
 class Player1:
 	
 	def __init__(self):
-		self.POSSIBLE_WIN_SEQUENCES = [(0,1,2), (3,4,5), (6,7,8), (0,3,6), (1,4,7), (2,5,8), (0,4,8), (2,4,6)]
-		self.WIN_SCORE = 10**6
-		self.APPROXIMATE_WIN_SCORE = 7
-		self.BIG_BOARD_WEIGHT = 23
 		pass
-
-	def assess_block(self, block, flag):
-		count = 0
-		count2 = 0
-		opponent_flag = 'x' if flag == 'o' else 'o'
-		if len(block) == 9:
-			for seq in self.POSSIBLE_WIN_SEQUENCES:
-				temp_seq = [block[index] for index in seq if block[index] != '-']
-				if flag in temp_seq:
-					if opponent_flag in temp_seq:
-						continue
-					if len(temp_seq) > 1:
-						count += self.APPROXIMATE_WIN_SCORE
-					count += 1
-				elif opponent_flag in temp_seq:
-					if len(temp_seq) > 1:
-						count2 += self.APPROXIMATE_WIN_SCORE
-					count2 += 1
-			return count - count2
-		else:
-			for seq in self.POSSIBLE_WIN_SEQUENCES:
-				temp_seq = [block[index/3][index%3] for index in seq if block[index/3][index%3] != '-']
-				if flag in temp_seq:
-					if opponent_flag in temp_seq:
-						continue
-					if len(temp_seq) > 1:
-						count += self.APPROXIMATE_WIN_SCORE
-					count += 1
-				elif opponent_flag in temp_seq:
-					if len(temp_seq) > 1:
-						count2 += self.APPROXIMATE_WIN_SCORE
-					count2 += 1
-			return count - count2	
-
-	def Winning_Heurisitic(self, temp_board, block_stat, blocks_allowed, old_move, flag):
+	
+	def Winning_Heurisitic(self, temp_board, block_stat, flag):
 		
-		gamestate, msg = terminal_state_reached(temp_board, block_stat)
+		gamestate, msg = self.terminal_state_reached(temp_board, block_stat)
 		if gamestate == True:
 			if msg != 'D':
-				return len(blocks_allowed) + self.WIN_SCORE if flag == 1 else -self.WIN_SCORE - len(blocks_allowed)
+				return 10**6 if flag == 1 else -10**6
 			else:
 				return 0
 		
-		start_row = 0
-		start_col = 0
-		flag = 'x' if flag == 0 else 'o'
-		ret = self.assess_block(block_stat, flag)
+		start_row, start_col = 0, 0
+		count, count2 = 0, 0
+		if flag == 0:
+			flag, opponent_flag = 'x', 'o'
+		else:
+			flag, opponent_flag = 'o', 'x'
+
+		POSSIBLE_WIN_SEQUENCES = [(0,1,2), (3,4,5), (6,7,8), (0,3,6), (1,4,7), (2,5,8), (0,4,8), (2,4,6)]
+		for seq in POSSIBLE_WIN_SEQUENCES:
+			temp_seq = [block_stat[index] for index in seq if block_stat[index] != '-']
+			if flag in temp_seq:
+				if opponent_flag in temp_seq:
+					continue
+				if len(temp_seq) > 1:
+					count += 7
+				count += 1
+			elif opponent_flag in temp_seq:
+				if len(temp_seq) > 1:
+					count2 += 7
+				count2 += 1
+
+		ret = (count - count2) * 23
 		
 		for i in xrange(9):
 			if block_stat[i] == '-':
 				temp_block = [ row[start_row:start_row + 3] for row in temp_board[start_col:start_col+3] ]
-				ret += self.assess_block(temp_block, flag)
+				count, count2 = 0, 0
+				opponent_flag = 'x' if flag == 'o' else 'o'
+				for seq in POSSIBLE_WIN_SEQUENCES:
+					temp_seq = [temp_block[index/3][index%3] for index in seq if temp_block[index/3][index%3] != '-']
+					if flag in temp_seq:
+						if opponent_flag in temp_seq:
+							continue
+						if len(temp_seq) > 1:
+							count += 7
+						count += 1
+					elif opponent_flag in temp_seq:
+						if len(temp_seq) > 1:
+							count2 += 7
+						count2 += 1
+				ret += count2 - count
 			elif flag == block_stat[i]:
 				if flag == 'x':
-					ret += self.APPROXIMATE_WIN_SCORE
+					ret += 7
 				else:
-					ret -= self.APPROXIMATE_WIN_SCORE
+					ret -= 7
 			else:
 				if flag == 'x':
-					ret -= self.APPROXIMATE_WIN_SCORE
+					ret -= 7
 				else:
-					ret += self.APPROXIMATE_WIN_SCORE	
+					ret += 7	
 			
 			start_col = (start_col + 3) % 9
 			if start_col == 0:
@@ -99,22 +94,7 @@ class Player1:
 
 		return ret
 
-		'''if 0 in blocks_allowed and 1 in blocks_allowed and 3 in blocks_allowed:
-			temp_block = [temp_board[0:2] for row in temp_board[0:2]]
-			ret = assess_block(temp_block, flag)
-			
-			temp_block = [temp_board[3:5] for row in temp_board[0:2]]
-			ret += assess_block(temp_block, flag)
-			
-			temp_block = [temp_board[0:2] for row in temp_board[3:5]]
-			ret += assess_block(temp_block, flag)
-		elif 1 in blocks_allowed and 2 in blocks_allowed and 5 in blocks_allowed:
-
-		block_no = (old_move[0]/3)*3 + old_move[1]/3
-		'''
-
-
-	def alpha_beta_pruning(self, temp_board, board_stat, old_move, alpha, beta, flag, depth):
+	def blocks(self, temp_board, temp_block, old_move):
 		for_corner = [0,2,3,5,6,8]
 
 		#List of permitted blocks, based on old move.
@@ -129,12 +109,12 @@ class Player1:
 			elif old_move[0] % 3 == 0 and old_move[1] in [2, 5, 8]:
 				## top right 3 blocks are allowed
 				blocks_allowed = [1,2,5]
-			elif old_move[0] in [2, 5, 8] and old_move[1] % 3 == 0:
+			elif old_move[0] in [2,5, 8] and old_move[1] % 3 == 0:
 				## bottom left 3 blocks are allowed
 				blocks_allowed  = [3,6,7]
 			elif old_move[0] in [2,5,8] and old_move[1] in [2,5,8]:
 				### bottom right 3 blocks are allowed
-				blocks_allowed = [5, 7, 8]
+				blocks_allowed = [5,7,8]
 			else:
 				print "SOMETHING REALLY WEIRD HAPPENED!"
 				sys.exit(1)
@@ -155,25 +135,139 @@ class Player1:
 			elif old_move[0] in [1,4,7] and old_move[1] in [2,5,8]:
 				## middle-right block
 				blocks_allowed = [5]
+
 			elif old_move[0] in [1,4,7] and old_move[1] in [1,4,7]:
 				blocks_allowed = [4]
+		for i in reversed(blocks_allowed):
+			if temp_block[i] != '-':
+				blocks_allowed.remove(i)
+		# We get all the empty cells in allowed blocks. If they're all full, we get all the empty cells in the entire board.
+		cells = self.get_empty_cells_out_of(temp_board, blocks_allowed,temp_block)
+		return cells
 
-                for i in reversed(blocks_allowed):
-                    if board_stat[i] != '-':
-                        blocks_allowed.remove(i)
+	def terminal_state_reached(self, game_board, block_stat):
 
-		cells = get_empty_out_of(temp_board, blocks_allowed, board_stat)
+		#Check if game is won!
+		bs = block_stat
+		## Row win
+		if (bs[0] == bs[1] and bs[1] == bs[2] and bs[1]!='-' and bs[1]!='d') or (bs[3]!='d' and bs[3]!='-' and bs[3] == bs[4] and bs[4] == bs[5]) or (bs[6]!='d' and bs[6]!='-' and bs[6] == bs[7] and bs[7] == bs[8]):
+		#	print block_stat
+			return True, 'W'
+		## Col win
+		elif (bs[0]!='d' and bs[0] == bs[3] and bs[3] == bs[6] and bs[0]!='-') or (bs[1]!='d'and bs[1] == bs[4] and bs[4] == bs[7] and bs[4]!='-') or (bs[2]!='d' and bs[2] == bs[5] and bs[5] == bs[8] and bs[5]!='-'):
+		#   print block_stat
+			return True, 'W'
+		## Diag win
+		elif (bs[0] == bs[4] and bs[4] == bs[8] and bs[0]!='-' and bs[0]!='d') or (bs[2] == bs[4] and bs[4] == bs[6] and bs[2]!='-' and bs[2]!='d'):
+		#	print block_stat
+			return True, 'W'
+		else:
+			smfl = 0
+			for i in range(9):
+				for j in range(9):
+					if game_board[i][j] == '-' and block_stat[(i/3)*3+(j/3)] == '-':
+						smfl = 1
+						break
+			if smfl == 1:
+			#Game is still on!
+				return False, 'Continue'
+			else:
+				return False, 'Tie'
+			#Changed scoring mechanism
+			# 1. If there is a tie, player with more boxes won, wins.
+			# 2. If no of boxes won is the same, player with more corner move, wins. 
+	                        point1 = 0
+	                        point2 = 0
+	                        for i in block_stat:
+	                            if i == 'x':
+	                                point1+=1
+	                            elif i=='o':
+	                                point2+=1
+				if point1>point2:
+					return True, 'P1'
+				elif point2>point1:
+					return True, 'P2'
+				else:
+	                                point1 = 0
+	                                point2 = 0
+	                                for i in range(len(game_board)):
+	                                    for j in range(len(game_board[i])):
+	                                        if i%3!=1 and j%3!=1:
+	                                            if game_board[i][j] == 'x':
+	                                                point1+=1
+	                                            elif game_board[i][j]=='o':
+	                                                point2+=1
+				        if point1>point2:
+					    return True, 'P1'
+				        elif point2>point1:
+					    return True, 'P2'
+	                                else:
+					    return True, 'D'
+
+	def update_overall_board(self, game_board, block_stat, move_ret, fl):
+		#check if we need to modify block_stat
+
+		updated_block = -1
+
+		block_no = (move_ret[0]/3)*3 + move_ret[1]/3
+		id1 = block_no/3
+		id2 = block_no%3
+		mg = 0
+		mflg = 0
+		if block_stat[block_no] == '-':
+			if game_board[id1*3][id2*3] == game_board[id1*3+1][id2*3+1] and game_board[id1*3+1][id2*3+1] == game_board[id1*3+2][id2*3+2] and game_board[id1*3+1][id2*3+1] != '-':
+				mflg=1
+			if game_board[id1*3+2][id2*3] == game_board[id1*3+1][id2*3+1] and game_board[id1*3+1][id2*3+1] == game_board[id1*3][id2*3 + 2] and game_board[id1*3+1][id2*3+1] != '-':
+				mflg=1
+			
+	                if mflg != 1:
+	                    for i in range(id2*3,id2*3+3):
+	                        if game_board[id1*3][i]==game_board[id1*3+1][i] and game_board[id1*3+1][i] == game_board[id1*3+2][i] and game_board[id1*3][i] != '-':
+	                                mflg = 1
+	                                break
+
+	                ### row-wise
+			if mflg != 1:
+	                    for i in range(id1*3,id1*3+3):
+	                        if game_board[i][id2*3]==game_board[i][id2*3+1] and game_board[i][id2*3+1] == game_board[i][id2*3+2] and game_board[i][id2*3] != '-':
+	                                mflg = 1
+	                                break
+
 		
-		if(depth > 3):
+		if mflg == 1:
+			block_stat[block_no] = fl
+			updated_block = block_no
+		
+	        #check for draw on the block.
+
+		id1 = block_no/3
+		id2 = block_no%3
+		cells = []
+		for i in range(id1*3,id1*3+3):
+		    for j in range(id2*3,id2*3+3):
+			if game_board[i][j] == '-':
+			    cells.append((i,j))
+
+	        if cells == [] and mflg!=1:
+	            block_stat[block_no] = 'd' #Draw
+	            updated_block = block_no
+	        
+	        return [block_stat, updated_block]
+
+	def alpha_beta_pruning(self, temp_board, board_stat, old_move, alpha, beta, flag, depth):
+
+		cells = self.blocks(temp_board, board_stat, old_move)
+		
+		if(depth == 4):
 			'''
 				Heuristic
 			'''
-			util = sys.maxint if flag else -sys.maxint - 1
+			'''util = 10**7 if flag else -10**7 - 1
 			best_move = old_move
 			for i in cells:
 				a, b  = i
 				temp_board[a][b] = 'o' if flag else 'x'
-				temp = self.Winning_Heurisitic(temp_board, board_stat, blocks_allowed, (a, b), flag)
+				temp = self.Winning_Heurisitic(temp_board, board_stat, (a, b), flag)
 				if flag:
 					if temp < util:
 						best_move = (a, b)
@@ -183,15 +277,28 @@ class Player1:
 						best_move = (a, b)
 						util = temp	
 				temp_board[a][b] = '-'
+			if best_move == old_move:
+				return [old_move[0], old_move[1], 0] 
 			return [best_move[0], best_move[1], util]
+			'''
+			return [old_move[0], old_move[1], self.Winning_Heurisitic(temp_board, board_stat, flag)]
 			
-		
+		symbol = 'o' if flag else 'x'
 		if depth%2 == 0:
 			'''Max Node'''
-			maxv = [-1, -1 , -sys.maxint-1]
+			maxv = [-1, -1 , -100000]
 			for i in cells:
 				a, b = i
-				temp_board[a][b] = 'o' if flag else 'x'
+				temp_board[a][b] = symbol
+
+				board_stat, updated_block = self.update_overall_board(temp_board, board_stat, (a, b), symbol)
+				gamestate, msg = self.terminal_state_reached(temp_board, board_stat)
+				if gamestate:
+					temp_board[a][b] = '-'
+					if updated_block!=-1:
+						board_stat[updated_block] = '-'
+					return [a, b, 10000]
+				
 				val = self.alpha_beta_pruning(temp_board, board_stat, (a,b), alpha, beta, flag^1, depth+1)
 				
 				if( val[2] > maxv[2]):
@@ -200,15 +307,26 @@ class Player1:
 				alpha = max(alpha, maxv[2])
 				temp_board[a][b] = '-'
 
+				if updated_block != -1:
+					board_stat[updated_block] = '-'
+
 				if(beta <= alpha):
 					break
 			return maxv
 		else:
 			'''Min Node'''
-			minv = [-1, -1 , sys.maxint]
+			minv = [-1, -1 , 100000]
 			for i in cells:
 				a, b = i
-				temp_board[a][b] = 'o' if flag else 'x'
+				temp_board[a][b] = symbol
+				
+				board_stat, updated_block = self.update_overall_board(temp_board, board_stat, (a, b), symbol)
+				gamestate, msg = self.terminal_state_reached(temp_board, board_stat)
+				if gamestate:
+					temp_board[a][b] = '-'
+					if updated_block!=-1:
+						board_stat[updated_block] = '-'
+					return [a, b, -10000]
 				
 				val = self.alpha_beta_pruning(temp_board, board_stat, (a,b), alpha, beta, flag^1, depth+1)
 				
@@ -218,17 +336,42 @@ class Player1:
 				beta = min(beta, minv[2])
 				temp_board[a][b] = '-'
 
+				if updated_block != -1:
+					board_stat[updated_block] = '-'
+
 				if(beta <= alpha):
 					break
 			return minv
 
-	def move(self,temp_board,temp_block,old_move,flag):
-#		while(1):
-#			pass
+	def move(self, temp_board, temp_block, old_move, flag):
 		flag = 1 if flag == 'x' else 0
-		cell = self.alpha_beta_pruning(temp_board, temp_block, old_move, -sys.maxint-1, sys.maxint, flag, 0)[0:2]
-		return tuple(cell[:2])
-		#return cells[random.randrange(len(cells))]
+		cell = tuple(self.alpha_beta_pruning(temp_board, temp_block, old_move, -10**7-1, 10**7, flag, 0)[0:2])
+		if cell[0] == -1 or cell[1] == -1:
+			cells = self.blocks(temp_board, temp_block, old_move)
+			return cells[random.randrange(len(cells))] 
+		print "Us: ", flag, cell[0], cell[1]
+		return cell
+
+	def get_empty_cells_out_of(self,gameb, blal, block_stat):
+		cells = []  # it will be list of tuples
+		#Iterate over possible blocks and get empty cells
+		for idb in blal:
+			id1 = idb/3
+			id2 = idb%3
+			for i in range(id1*3,id1*3+3):
+				for j in range(id2*3,id2*3+3):
+					if gameb[i][j] == '-':
+						cells.append((i,j))
+
+		# If all the possible blocks are full, you can move anywhere
+		if cells == []:
+			for i in range(9):
+				for j in range(9):
+					no = (i/3)*3
+					no += (j/3)
+					if gameb[i][j] == '-' and block_stat[no] == '-':
+						cells.append((i,j))	
+		return cells
 
 class Player2:
 	
@@ -279,10 +422,10 @@ class Player2:
 				blocks_allowed = [5]
 			elif old_move[0] in [1,4,7] and old_move[1] in [1,4,7]:
 				blocks_allowed = [4]
-                
-                for i in reversed(blocks_allowed):
-                    if temp_block[i] != '-':
-                        blocks_allowed.remove(i)
+
+		for i in reversed(blocks_allowed):
+			if temp_block[i] != '-':
+				blocks_allowed.remove(i)
 
 	# We get all the empty cells in allowed blocks. If they're all full, we get all the empty cells in the entire board.
 		cells = get_empty_out_of(temp_board,blocks_allowed,temp_block)
@@ -322,8 +465,8 @@ def get_empty_out_of(gameb, blal,block_stat):
 	if cells == []:
 		for i in range(9):
 			for j in range(9):
-                                no = (i/3)*3
-                                no += (j/3)
+				no = (i/3)*3
+				no += (j/3)
 				if gameb[i][j] == '-' and block_stat[no] == '-':
 					cells.append((i,j))	
 	return cells
@@ -574,7 +717,7 @@ def simulate(obj1,obj2):
 	MESSAGE = ''
 
         #Make your move in 6 seconds!
-	TIMEALLOWED = 60
+	TIMEALLOWED = 6
 
 	print_lists(game_board, block_stat)
 
@@ -604,6 +747,54 @@ def simulate(obj1,obj2):
 		# Check if the move made is valid
 		if not check_valid_move(game_board, block_stat,ret_move_pl1, old_move):
 			## player1 loses - he made the wrong move.
+			print ret_move_pl1
+			blocks_allowed  = []
+			for_corner = [0, 2, 3, 5, 6, 8]
+
+			if old_move[0] in for_corner and old_move[1] in for_corner:
+				## we will have 3 representative blocks, to choose from
+
+				if old_move[0] % 3 == 0 and old_move[1] % 3 == 0:
+					## top left 3 blocks are allowed
+					blocks_allowed = [0, 1, 3]
+				elif old_move[0] % 3 == 0 and old_move[1] in [2, 5, 8]:
+					## top right 3 blocks are allowed
+					blocks_allowed = [1,2,5]
+				elif old_move[0] in [2,5, 8] and old_move[1] % 3 == 0:
+					## bottom left 3 blocks are allowed
+					blocks_allowed  = [3,6,7]
+				elif old_move[0] in [2,5,8] and old_move[1] in [2,5,8]:
+					### bottom right 3 blocks are allowed
+					blocks_allowed = [5,7,8]
+				else:
+					print "SOMETHING REALLY WEIRD HAPPENED!"
+					sys.exit(1)
+			else:
+			#### we will have only 1 block to choose from (or maybe NONE of them, which calls for a free move)
+				if old_move[0] % 3 == 0 and old_move[1] in [1,4,7]:
+					## upper-center block
+					blocks_allowed = [1]
+	
+				elif old_move[0] in [1,4,7] and old_move[1] % 3 == 0:
+					## middle-left block
+					blocks_allowed = [3]
+		
+				elif old_move[0] in [2,5,8] and old_move[1] in [1,4,7]:
+				## lower-center block
+					blocks_allowed = [7]
+
+				elif old_move[0] in [1,4,7] and old_move[1] in [2,5,8]:
+					## middle-right block
+					blocks_allowed = [5]
+				elif old_move[0] in [1,4,7] and old_move[1] in [1,4,7]:
+					blocks_allowed = [4]
+			
+			for i in reversed(blocks_allowed):
+				if temp_block[i] != '-':
+					blocks_allowed.remove(i)
+			
+			cells = get_empty_out_of(game_board, blocks_allowed, temp_block)
+			print cells
 			WINNER, MESSAGE = decide_winner_and_get_message('P1', 'L',   'MADE AN INVALID MOVE')
 			break
 
