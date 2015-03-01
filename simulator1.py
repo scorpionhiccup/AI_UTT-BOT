@@ -1,7 +1,7 @@
 import sys
 import random
 import signal
-
+import gupta, sourav
 #Timer handler, helper function
 
 class TimedOutExc(Exception):
@@ -36,8 +36,8 @@ class Player1:
 			else:
 				return 0
 		
-		start_row, start_col = 0, 0
-		count, count2 = 0, 0
+		start_row, start_col, count, count2 = 0, 0, 0, 0
+
 		if flag == 0:
 			flag, opponent_flag = 'x', 'o'
 		else:
@@ -109,7 +109,7 @@ class Player1:
 			elif old_move[0] % 3 == 0 and old_move[1] in [2, 5, 8]:
 				## top right 3 blocks are allowed
 				blocks_allowed = [1,2,5]
-			elif old_move[0] in [2,5, 8] and old_move[1] % 3 == 0:
+			elif old_move[0] in [2, 5, 8] and old_move[1] % 3 == 0:
 				## bottom left 3 blocks are allowed
 				blocks_allowed  = [3,6,7]
 			elif old_move[0] in [2,5,8] and old_move[1] in [2,5,8]:
@@ -206,82 +206,53 @@ class Player1:
 
 	def update_overall_board(self, game_board, block_stat, move_ret, fl):
 		#check if we need to modify block_stat
-
-		updated_block = -1
-
+		
 		block_no = (move_ret[0]/3)*3 + move_ret[1]/3
-		id1 = block_no/3
-		id2 = block_no%3
-		mg = 0
-		mflg = 0
+		updated_block, id1, id2, mflg = -1, block_no/3, block_no%3, 0
+		
 		if block_stat[block_no] == '-':
 			if game_board[id1*3][id2*3] == game_board[id1*3+1][id2*3+1] and game_board[id1*3+1][id2*3+1] == game_board[id1*3+2][id2*3+2] and game_board[id1*3+1][id2*3+1] != '-':
 				mflg=1
+			
 			if game_board[id1*3+2][id2*3] == game_board[id1*3+1][id2*3+1] and game_board[id1*3+1][id2*3+1] == game_board[id1*3][id2*3 + 2] and game_board[id1*3+1][id2*3+1] != '-':
 				mflg=1
 			
-	                if mflg != 1:
-	                    for i in range(id2*3,id2*3+3):
-	                        if game_board[id1*3][i]==game_board[id1*3+1][i] and game_board[id1*3+1][i] == game_board[id1*3+2][i] and game_board[id1*3][i] != '-':
-	                                mflg = 1
-	                                break
-
-	                ### row-wise
 			if mflg != 1:
-	                    for i in range(id1*3,id1*3+3):
-	                        if game_board[i][id2*3]==game_board[i][id2*3+1] and game_board[i][id2*3+1] == game_board[i][id2*3+2] and game_board[i][id2*3] != '-':
-	                                mflg = 1
-	                                break
+				for i in range(id2*3,id2*3+3):
+					if game_board[id1*3][i]==game_board[id1*3+1][i] and game_board[id1*3+1][i] == game_board[id1*3+2][i] and game_board[id1*3][i] != '-':
+						mflg = 1
+						break
 
+			### row-wise
+			if mflg != 1:
+				for i in range(id1*3,id1*3+3):
+					if game_board[i][id2*3]==game_board[i][id2*3+1] and game_board[i][id2*3+1] == game_board[i][id2*3+2] and game_board[i][id2*3] != '-':
+						mflg = 1
+						break
 		
-		if mflg == 1:
-			block_stat[block_no] = fl
-			updated_block = block_no
+			if mflg == 1:
+				block_stat[block_no], updated_block = fl, block_no
+				return [block_stat, updated_block]
 		
-	        #check for draw on the block.
-
-		id1 = block_no/3
-		id2 = block_no%3
-		cells = []
+		#check for draw on the block.
+		mflg = 1
 		for i in range(id1*3,id1*3+3):
-		    for j in range(id2*3,id2*3+3):
-			if game_board[i][j] == '-':
-			    cells.append((i,j))
+			for j in range(id2*3,id2*3+3):
+				if game_board[i][j] == '-':
+					mflg = 0
+					break
 
-	        if cells == [] and mflg!=1:
-	            block_stat[block_no] = 'd' #Draw
-	            updated_block = block_no
-	        
-	        return [block_stat, updated_block]
+		if mflg == 1:
+			block_stat[block_no], updated_block = 'd', block_no #Draw
+		return [block_stat, updated_block]
 
 	def alpha_beta_pruning(self, temp_board, board_stat, old_move, alpha, beta, flag, depth):
 
 		cells = self.blocks(temp_board, board_stat, old_move)
 		
 		if(depth == 4):
-			'''
-				Heuristic
-			'''
-			'''util = 10**7 if flag else -10**7 - 1
-			best_move = old_move
-			for i in cells:
-				a, b  = i
-				temp_board[a][b] = 'o' if flag else 'x'
-				temp = self.Winning_Heurisitic(temp_board, board_stat, (a, b), flag)
-				if flag:
-					if temp < util:
-						best_move = (a, b)
-						util = temp
-				else:
-					if temp > util:
-						best_move = (a, b)
-						util = temp	
-				temp_board[a][b] = '-'
-			if best_move == old_move:
-				return [old_move[0], old_move[1], 0] 
-			return [best_move[0], best_move[1], util]
-			'''
-			return [old_move[0], old_move[1], self.Winning_Heurisitic(temp_board, board_stat, flag)]
+			''' Heuristic '''
+		return [old_move[0], old_move[1], self.Winning_Heurisitic(temp_board, board_stat, flag)]
 			
 		symbol = 'o' if flag else 'x'
 		if depth%2 == 0:
@@ -863,13 +834,13 @@ if __name__ == '__main__':
 		print '                2 => Human vs. Random Player'
 		print '                3 => Human vs. Human'
 		sys.exit(1)
- 
+
 	obj1 = ''
 	obj2 = ''
 	option = sys.argv[1]	
 	if option == '1':
 		obj1 = Player1()
-		obj2 = Player2()
+		obj2 = sourav.Player1()
 
 	elif option == '2':
 		obj1 = Player1()
@@ -877,11 +848,12 @@ if __name__ == '__main__':
 	elif option == '3':
 		obj1 = Manual_player()
 		obj2 = Manual_player()
-        
-        # Deciding player1 / player2 after a coin toss
-        # However, in the tournament, each player will get a chance to go 1st. 
-        num = random.uniform(0,1)
-        if num > 0.5:
+
+	# Deciding player1 / player2 after a coin toss
+	# However, in the tournament, each player will get a chance to go 1st. 
+	#num = random.uniform(0,1)
+	num = 0.4
+	if num > 0.5:
 		simulate(obj2, obj1)
 	else:
 		simulate(obj1, obj2)
